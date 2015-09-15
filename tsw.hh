@@ -15,19 +15,22 @@
 #include <array>
 #include <mutex>
 #include <fstream>
+#include <iomanip>
 
 namespace tsw
 {
-    template <class... Ts> class ThreadSafeWriter
+    class ThreadSafeWriter
     {
     public:
         virtual void Flush() = 0;
     };
 
-    template <class U, class... Ts> class ThreadSafeWriter<U, Ts...> : public ThreadSafeWriter<>
+    template <class... Ts> class BaseThreadSafeWriter : public ThreadSafeWriter { };
+
+    template <class U, class... Ts> class BaseThreadSafeWriter<U, Ts...> : public BaseThreadSafeWriter<>
     {
     public:
-        ThreadSafeWriter() : _columnNames(nullptr) { }
+        BaseThreadSafeWriter() : _columnNames(nullptr) { }
 
         const static size_t itemDim = sizeof...(Ts) + 1;
 
@@ -51,7 +54,7 @@ namespace tsw
             _columnNames = new nameCollectionT(temp);
         }
 
-        virtual ~ThreadSafeWriter()
+        virtual ~BaseThreadSafeWriter()
         {
             if (_columnNames)
             {
@@ -91,7 +94,6 @@ namespace tsw
 
         void Flush() override
         {
-            // std::cout << "Flushing..." << std::endl;
             std::lock_guard<std::recursive_mutex> lock(_mutex);
             for (auto item : _data) {
                 Write(item);
@@ -114,23 +116,23 @@ namespace tsw
         nameCollectionT* _columnNames;
     };
 
-    template <class... Ts> class TSVWriter : public ThreadSafeWriter<> { };
+    template <class... Ts> class TSVWriter : public BaseThreadSafeWriter<> { };
 
-    template <class U, class... Ts> class TSVWriter<U, Ts...> : public ThreadSafeWriter<U, Ts...>
+    template <class U, class... Ts> class TSVWriter<U, Ts...> : public BaseThreadSafeWriter<U, Ts...>
     {
     protected:
-        using ThreadSafeWriter<U, Ts...>::_columnNames;
+        using BaseThreadSafeWriter<U, Ts...>::_columnNames;
 
     public:
-        using ThreadSafeWriter<U, Ts...>::itemDim;
+        using BaseThreadSafeWriter<U, Ts...>::itemDim;
 
-        TSVWriter(const std::string& fileName) : _fileName(fileName), _stream(nullptr), _separator("\t")
+        TSVWriter(const std::string& fileName) : _fileName(fileName), _stream(nullptr), _separator("\t"), _precision(6)
         {
         }
 
         ~TSVWriter()
         {
-            ThreadSafeWriter<U, Ts...>::Flush();
+            BaseThreadSafeWriter<U, Ts...>::Flush();
             if (_opened)
             {
                 delete _stream;
@@ -142,10 +144,20 @@ namespace tsw
             _separator = sep;
         }
 
+        void SetPrecision(int digits)
+        {
+            _precision = digits;
+            if (_opened)
+            {
+                (*_stream) << std::setprecision(_precision);
+            }
+        }
+
     protected:
         void Open()
         {
             _stream = new std::ofstream(_fileName);
+            (*_stream) << std::setprecision(_precision);
             if (_columnNames)
             {
                 for (size_t i = 0; i < itemDim - 1; i++)
@@ -158,6 +170,8 @@ namespace tsw
         }
 
         bool _opened = false;
+
+        int _precision;
 
         std::string _separator;
 
