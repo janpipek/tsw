@@ -9,7 +9,6 @@
 
 #include <tuple>
 #include <vector>
-#include <thread>
 #include <iostream>
 #include <utility>
 #include <array>
@@ -17,12 +16,40 @@
 #include <fstream>
 #include <iomanip>
 
+#ifdef TSW_USE_POSIX_THREADS
+    #include <pthread.h>
+    #include <stdexcept>
+    #define TSW_MUTEX_DECLARATION pthread_mutex_t _mutex;
+    #define TSW_MUTEX_INITIALIZATION pthread_mutexattr_t attr;\
+        pthread_mutexattr_init(&attr);\
+        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);\
+        pthread_mutex_init(&_mutex, &attr);
+    #define TSW_LOCK bool ok = true;\
+        pthread_mutex_lock(&_mutex);\
+        try {
+    #define TSW_UNLOCK } \
+        catch(...) { ok = false; }\
+        pthread_mutex_unlock(&_mutex);\
+        if (!ok) {\
+            throw std::runtime_error("Error in threaded writing");\
+        }
+#else
+    #define TSW_USE_CPPT11_THREADS
+    #include <thread>
+    #define TSW_MUTEX_INITIALIZATION ;
+    #define TSW_MUTEX_DECLARATION std::recursive_mutex _mutex;
+    #define TSW_LOCK { std::lock_guard<std::recursive_mutex> lock(_mutex);
+    #define TSW_UNLOCK }
+#endif
+
 namespace tsw
 {
     class ThreadSafeWriter
     {
     public:
         virtual void Flush() = 0;
+
+        virtual ~ThreadSafeWriter() = default;     // Enable polymorphism
     };
 
     template <class... Ts> class BaseThreadSafeWriter : public ThreadSafeWriter { };
@@ -30,7 +57,10 @@ namespace tsw
     template <class U, class... Ts> class BaseThreadSafeWriter<U, Ts...> : public BaseThreadSafeWriter<>
     {
     public:
-        BaseThreadSafeWriter() : _columnNames(nullptr) { }
+        BaseThreadSafeWriter() : _columnNames(nullptr)
+        {
+            TSW_MUTEX_INITIALIZATION;
+        }
 
         const static size_t itemDim = sizeof...(Ts) + 1;
 
@@ -64,12 +94,13 @@ namespace tsw
 
         void Store(const itemT& item)
         {
-            std::lock_guard<std::recursive_mutex> lock(_mutex);
+            TSW_LOCK;
             _data.push_back(item);
             if (IsFlushRequired())
             {
                 Flush();
             }
+            TSW_UNLOCK;
         }
 
         void Store(const U& first, const Ts&... args)
@@ -84,7 +115,6 @@ namespace tsw
 
         virtual void SetCacheCapacity(size_t capacity)
         {
-            std::lock_guard<std::recursive_mutex> lock(_mutex);
             _cacheCapacity = capacity;
             if (IsFlushRequired())
             {
@@ -94,12 +124,13 @@ namespace tsw
 
         void Flush() override
         {
-            std::lock_guard<std::recursive_mutex> lock(_mutex);
+            TSW_LOCK;
             for (auto item : _data) {
                 Write(item);
             }
             FinishFlush();
             _data.clear();
+            TSW_UNLOCK;
         }
 
         virtual void FinishFlush() { }
@@ -111,7 +142,7 @@ namespace tsw
 
         std::vector<itemT> _data;
 
-        std::recursive_mutex _mutex;
+        TSW_MUTEX_DECLARATION;
 
         nameCollectionT* _columnNames;
     };
@@ -123,6 +154,8 @@ namespace tsw
     protected:
         using BaseThreadSafeWriter<U, Ts...>::_columnNames;
 
+        // using BaseThreadSafeWriter<U, Ts...>::Flush();
+
     public:
         using BaseThreadSafeWriter<U, Ts...>::itemDim;
 
@@ -130,11 +163,12 @@ namespace tsw
         {
         }
 
-        ~TSVWriter()
+        virtual ~TSVWriter()
         {
             BaseThreadSafeWriter<U, Ts...>::Flush();
             if (_opened)
             {
+                _stream->close();
                 delete _stream;
             }
         }
