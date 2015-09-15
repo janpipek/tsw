@@ -5,6 +5,7 @@
 #include <utility>
 #include <array>
 #include <mutex>
+#include <fstream>
 
 namespace tsw
 {
@@ -72,15 +73,18 @@ namespace tsw
             }
         }
 
-        void Flush()
+        virtual void Flush()
         {
-            std::cout << "Flushing..." << std::endl;
+            // std::cout << "Flushing..." << std::endl;
             std::lock_guard<std::recursive_mutex> lock(_mutex);
             for (auto item : _data) {
                 Write(item);
             }
+            FinishFlush();
             _data.clear();
         }
+
+        virtual void FinishFlush() { }
 
     protected:
         virtual void Write(const std::tuple<U, Ts...>& item) = 0;
@@ -98,26 +102,67 @@ namespace tsw
 
     template <class U, class... Ts> class TSVWriter<U, Ts...> : public ThreadSafeWriter<U, Ts...>
     {
+    protected:
+        using ThreadSafeWriter<U, Ts...>::_columnNames;
+
     public:
+        using ThreadSafeWriter<U, Ts...>::itemDim;
+
+        TSVWriter(const std::string& fileName) : _fileName(fileName), _stream(nullptr), _separator("\t")
+        {
+        }
+
         ~TSVWriter()
         {
             ThreadSafeWriter<U, Ts...>::Flush();
+            if (_opened)
+            {
+                delete _stream;
+            }
         }
 
     protected:
+        void Open()
+        {
+            _stream = new std::ofstream(_fileName);
+            for (size_t i = 0; i < itemDim - 1; i++)
+            {
+                *_stream << _columnNames[itemDim - 1] << _separator;
+            }
+            *_stream << _columnNames[itemDim - 1] << std::endl;
+            _opened = true;
+        }
+
+        bool _opened = false;
+
+        std::string _separator;
+
+        std::ofstream* _stream;
+
+        std::string _fileName;
+
+        virtual void FinishFlush()
+        {
+            _stream->flush();
+        }
+
         virtual void Write(const std::tuple<U, Ts...>& item) override
         {
+            if (!_opened)
+            {
+                Open();
+            }
             WriteItem(item);
         }
 
         template<std::size_t I = 0, typename... Vs> inline typename std::enable_if<I == sizeof...(Vs), void>::type WriteItem(const std::tuple<Vs...>& t)
         {
-            std::cout << "\n";
+            *_stream << "\n";
         }
 
         template<std::size_t I = 0, typename... Vs> inline typename std::enable_if<I < sizeof...(Vs), void>::type WriteItem(const std::tuple<Vs...>& t)
         {
-            std::cout << std::get<I>(t) << "\t";
+            *_stream << std::get<I>(t) << _separator;
             WriteItem<I + 1, Vs...>(t);
         }
     };

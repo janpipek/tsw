@@ -4,7 +4,7 @@ using namespace tsw;
 
 int main()
 {
-    TSVWriter<int, int, std::string> writer;//{{"i", "j", "k"}};
+    TSVWriter<int, int, std::string> writer("out.tsv");//{{"i", "j", "k"}};
     writer.SetColumnNames("aa", "bb", "cc");
     std::string f = "ahoj";
     std::tuple<int, int, std::string> x{1, 2, f};
