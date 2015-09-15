@@ -138,7 +138,7 @@ namespace tsw
     protected:
         virtual void Write(const std::tuple<U, Ts...>& item) = 0;
 
-        size_t _cacheCapacity = 100;
+        size_t _cacheCapacity = 1000;
 
         std::vector<itemT> _data;
 
