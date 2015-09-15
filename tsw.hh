@@ -14,34 +14,37 @@ namespace tsw
     template <class U, class... Ts> class ThreadSafeWriter<U, Ts...>
     {
     public:
+        ThreadSafeWriter() : _columnNames(nullptr) { }
+
         const static size_t itemDim = sizeof...(Ts) + 1;
 
         typedef std::array<std::string, itemDim> nameCollectionT;
 
         typedef std::tuple<U, Ts...> itemT;
 
-        ThreadSafeWriter(nameCollectionT columnNames) : _columnNames(columnNames)
+        void SetColumnNames(const nameCollectionT& columnNames)
         {
-
-        }
-
-        ThreadSafeWriter()
-        {
-
-        }
-
-        void SetColumnNames(nameCollectionT columnNames)
-        {
-            _columnNames = columnNames;
+            _columnNames = new nameCollectionT(columnNames);
         }
 
         template <class... Vs> void SetColumnNames(const std::string& name1, const Vs&... names)
         {
             static_assert(sizeof...(Vs) == (itemDim - 1), "Column names must be of the same dimension as data.");
-            _columnNames = {name1, names...};
+            if (_columnNames)
+            {
+                delete _columnNames;
+            }
+            auto temp = nameCollectionT{name1, names...};
+            _columnNames = new nameCollectionT(temp);
         }
 
-        virtual ~ThreadSafeWriter() = default;
+        virtual ~ThreadSafeWriter()
+        {
+            if (_columnNames)
+            {
+                delete _columnNames;
+            }
+        }
 
         void Store(const itemT& item)
         {
@@ -95,7 +98,7 @@ namespace tsw
 
         std::recursive_mutex _mutex;
 
-        nameCollectionT _columnNames;
+        nameCollectionT* _columnNames;
     };
 
     template <class... Ts> class TSVWriter { };
@@ -121,15 +124,23 @@ namespace tsw
             }
         }
 
+        void SetSeparator(const std::string& sep)
+        {
+            _separator = sep;
+        }
+
     protected:
         void Open()
         {
             _stream = new std::ofstream(_fileName);
-            for (size_t i = 0; i < itemDim - 1; i++)
+            if (_columnNames)
             {
-                *_stream << _columnNames[itemDim - 1] << _separator;
+                for (size_t i = 0; i < itemDim - 1; i++)
+                {
+                    *_stream << (*_columnNames)[i] << _separator;
+                }
+                *_stream << (*_columnNames)[itemDim - 1] << std::endl;
             }
-            *_stream << _columnNames[itemDim - 1] << std::endl;
             _opened = true;
         }
 
