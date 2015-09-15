@@ -18,9 +18,13 @@
 
 namespace tsw
 {
-    template <class... Ts> class ThreadSafeWriter {  };
+    template <class... Ts> class ThreadSafeWriter
+    {
+    public:
+        virtual void Flush() = 0;
+    };
 
-    template <class U, class... Ts> class ThreadSafeWriter<U, Ts...>
+    template <class U, class... Ts> class ThreadSafeWriter<U, Ts...> : public ThreadSafeWriter<>
     {
     public:
         ThreadSafeWriter() : _columnNames(nullptr) { }
@@ -85,7 +89,7 @@ namespace tsw
             }
         }
 
-        virtual void Flush()
+        void Flush() override
         {
             // std::cout << "Flushing..." << std::endl;
             std::lock_guard<std::recursive_mutex> lock(_mutex);
@@ -110,7 +114,7 @@ namespace tsw
         nameCollectionT* _columnNames;
     };
 
-    template <class... Ts> class TSVWriter { };
+    template <class... Ts> class TSVWriter : public ThreadSafeWriter<> { };
 
     template <class U, class... Ts> class TSVWriter<U, Ts...> : public ThreadSafeWriter<U, Ts...>
     {

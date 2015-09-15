@@ -3,3 +3,4 @@ test: test.cc tsw.hh
 
 run: test
 	./test
+	cat out.tsv
