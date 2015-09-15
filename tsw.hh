@@ -1,3 +1,12 @@
+/**
+  * (T)hread-(S)afe cached data (W)riter for C++ 11
+  *
+  * Copyright (c) 2015 Jan Pipek (MIT licence)
+  *
+  * This file can be used as is without external dependencies,
+  * see https://github.com/janpipek/tsw .
+  */
+
 #include <tuple>
 #include <vector>
 #include <thread>
