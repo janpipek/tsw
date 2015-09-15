@@ -34,12 +34,19 @@
             throw std::runtime_error("Error in threaded writing");\
         }
 #else
-    #define TSW_USE_CPPT11_THREADS
-    #include <thread>
-    #define TSW_MUTEX_INITIALIZATION ;
-    #define TSW_MUTEX_DECLARATION std::recursive_mutex _mutex;
-    #define TSW_LOCK { std::lock_guard<std::recursive_mutex> lock(_mutex);
-    #define TSW_UNLOCK }
+    #ifdef TSW_NO_THREADS
+        #define TSW_MUTEX_INITIALIZATION
+        #define TSW_MUTEX_DECLARATION
+        #define TSW_LOCK
+        #define TSW_UNLOCK
+    #else
+        #define TSW_USE_CPPT11_THREADS
+        #include <thread>
+        #define TSW_MUTEX_INITIALIZATION
+        #define TSW_MUTEX_DECLARATION std::recursive_mutex _mutex;
+        #define TSW_LOCK { std::lock_guard<std::recursive_mutex> lock(_mutex);
+        #define TSW_UNLOCK }
+    #endif
 #endif
 
 namespace tsw

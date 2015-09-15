@@ -4,6 +4,7 @@ It can use two threading model for mutex:
 
 * from C++11 standard (by default)
 * from pthreads (set macro `TSW_USE_POSIX_THREADS`)
+* no threading model, in case you want to use it non-threading application (set macro `TSW_NO_THREADS`)
 
 ## Dependencies
 
