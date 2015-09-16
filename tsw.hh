@@ -219,13 +219,13 @@ namespace tsw
 
         bool _opened = false;
 
-        int _precision;
-
-        std::string _separator;
+        std::string _fileName;
 
         std::ofstream* _stream;
 
-        std::string _fileName;
+        std::string _separator;
+
+        int _precision;
 
         virtual void FinishFlush()
         {
