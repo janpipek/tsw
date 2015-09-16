@@ -19,11 +19,11 @@
 #ifdef TSW_USE_POSIX_THREADS
     #include <pthread.h>
     #include <stdexcept>
-    #define TSW_MUTEX_DECLARATION pthread_mutex_t _mutex;
+    #define TSW_MUTEX_DECLARATION pthread_mutex_t _mutex
     #define TSW_MUTEX_INITIALIZATION pthread_mutexattr_t attr;\
         pthread_mutexattr_init(&attr);\
         pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);\
-        pthread_mutex_init(&_mutex, &attr);
+        pthread_mutex_init(&_mutex, &attr)
     #define TSW_LOCK bool ok = true;\
         pthread_mutex_lock(&_mutex);\
         try {
@@ -43,8 +43,8 @@
         #define TSW_USE_CPPT11_THREADS
         #include <thread>
         #define TSW_MUTEX_INITIALIZATION
-        #define TSW_MUTEX_DECLARATION std::recursive_mutex _mutex;
-        #define TSW_LOCK { std::lock_guard<std::recursive_mutex> lock(_mutex);
+        #define TSW_MUTEX_DECLARATION std::recursive_mutex _mutex
+        #define TSW_LOCK { std::lock_guard<std::recursive_mutex> lock(_mutex)
         #define TSW_UNLOCK }
     #endif
 #endif
@@ -122,11 +122,17 @@ namespace tsw
 
         virtual void SetCacheCapacity(size_t capacity)
         {
+            TSW_LOCK;
             _cacheCapacity = capacity;
             if (IsFlushRequired())
             {
                 Flush();
             }
+            else
+            {
+                _data.reserve(_cacheCapacity);
+            }
+            TSW_UNLOCK;
         }
 
         void Flush() override
@@ -137,6 +143,7 @@ namespace tsw
             }
             FinishFlush();
             _data.clear();
+            _data.reserve(_cacheCapacity);
             TSW_UNLOCK;
         }
 
