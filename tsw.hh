@@ -51,10 +51,10 @@
 namespace tsw
 {
     /**
-      * @short The base class of all thread safe writers.
+      * @short Base class of all thread safe writers.
       *
       * The implementation is defined using templates (including most methods)
-      * Only non-templated abstract methods can be declared here.
+      * Only non-templated abstract methods can be declared (as interface) here.
       */
     class ThreadSafeWriter
     {
@@ -70,6 +70,11 @@ namespace tsw
 
     template <class... Ts> class BaseThreadSafeWriter : public ThreadSafeWriter { };
 
+    /**
+      * @short Base templated class implementing the cache and thread-safety.
+      *
+      * The particular method for writing is to be implemented in child classes.
+      */
     template <class U, class... Ts> class BaseThreadSafeWriter<U, Ts...> : public BaseThreadSafeWriter<>
     {
     public:
@@ -157,7 +162,7 @@ namespace tsw
         }
 
     protected:
-        virtual void FinishFlush() { }        
+        virtual void FinishFlush() { }
 
         virtual void Write(const std::tuple<U, Ts...>& item) = 0;
 
@@ -172,23 +177,31 @@ namespace tsw
 
     template <class... Ts> class TSVWriter : public BaseThreadSafeWriter<> { };
 
+    /**
+      * @short Writer for tabular text formats (TSV, CSV, ...)
+      *
+      * The default variant uses \n for line separation, \t for column separation.
+      *
+      * Warning: strings are not escaped in any way
+      */
     template <class U, class... Ts> class TSVWriter<U, Ts...> : public BaseThreadSafeWriter<U, Ts...>
     {
     protected:
         using BaseThreadSafeWriter<U, Ts...>::_columnNames;
 
-        // using BaseThreadSafeWriter<U, Ts...>::Flush();
+        using BaseThreadSafeWriter<U, Ts...>::Flush;
 
     public:
         using BaseThreadSafeWriter<U, Ts...>::itemDim;
 
-        TSVWriter(const std::string& fileName) : _fileName(fileName), _stream(nullptr), _separator("\t"), _precision(6)
+        TSVWriter(const std::string& fileName) : _fileName(fileName), _stream(nullptr),
+            _columnSeparator("\t"), _lineSeparator("\n"), _precision(6)
         {
         }
 
         virtual ~TSVWriter()
         {
-            BaseThreadSafeWriter<U, Ts...>::Flush();
+            Flush();
             if (_opened)
             {
                 _stream->close();
@@ -196,9 +209,14 @@ namespace tsw
             }
         }
 
-        void SetSeparator(const std::string& sep)
+        void SetColumnSeparator(const std::string& sep)
         {
-            _separator = sep;
+            _columnSeparator = sep;
+        }
+
+        void SetLineSeparator(const std::string& sep)
+        {
+            _lineSeparator = sep;
         }
 
         void SetPrecision(int digits)
@@ -219,9 +237,10 @@ namespace tsw
             {
                 for (size_t i = 0; i < itemDim - 1; i++)
                 {
-                    *_stream << (*_columnNames)[i] << _separator;
+                    *_stream << (*_columnNames)[i] << _columnSeparator;
                 }
-                *_stream << (*_columnNames)[itemDim - 1] << std::endl;
+                *_stream << (*_columnNames)[itemDim - 1] << _lineSeparator;
+                _stream->flush();
             }
             _opened = true;
         }
@@ -232,7 +251,9 @@ namespace tsw
 
         std::ofstream* _stream;
 
-        std::string _separator;
+        std::string _columnSeparator;
+
+        std::string _lineSeparator;
 
         int _precision;
 
@@ -252,12 +273,12 @@ namespace tsw
 
         template<std::size_t I = 0, typename... Vs> inline typename std::enable_if<I == sizeof...(Vs), void>::type WriteItem(const std::tuple<Vs...>&)
         {
-            *_stream << "\n";
+            *_stream << _lineSeparator;
         }
 
         template<std::size_t I = 0, typename... Vs> inline typename std::enable_if<I < sizeof...(Vs), void>::type WriteItem(const std::tuple<Vs...>& t)
         {
-            *_stream << std::get<I>(t) << _separator;
+            *_stream << std::get<I>(t) << _columnSeparator;
             WriteItem<I + 1, Vs...>(t);
         }
     };
