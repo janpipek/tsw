@@ -12,7 +12,6 @@
 #include <iostream>
 #include <utility>
 #include <array>
-#include <mutex>
 #include <fstream>
 #include <iomanip>
 
@@ -41,7 +40,7 @@
         #define TSW_UNLOCK
     #else
         #define TSW_USE_CPPT11_THREADS
-        #include <thread>
+        #include <mutex>
         #define TSW_MUTEX_INITIALIZATION
         #define TSW_MUTEX_DECLARATION std::recursive_mutex _mutex
         #define TSW_LOCK { std::lock_guard<std::recursive_mutex> lock(_mutex)
@@ -51,9 +50,19 @@
 
 namespace tsw
 {
+    /**
+      * @short The base class of all thread safe writers.
+      *
+      * The implementation is defined using templates (including most methods)
+      * Only non-templated abstract methods can be declared here.
+      */
     class ThreadSafeWriter
     {
     public:
+        virtual void SetCacheCapacity(size_t capacity) = 0;
+
+        virtual bool IsFlushRequired() = 0;
+
         virtual void Flush() = 0;
 
         virtual ~ThreadSafeWriter() = default;     // Enable polymorphism
@@ -115,12 +124,12 @@ namespace tsw
             Store(std::make_tuple(first, args...));
         }
 
-        virtual bool IsFlushRequired()
+        bool IsFlushRequired() override
         {
             return _data.size() == _cacheCapacity;
         }
 
-        virtual void SetCacheCapacity(size_t capacity)
+        void SetCacheCapacity(size_t capacity) override
         {
             TSW_LOCK;
             _cacheCapacity = capacity;
@@ -147,9 +156,9 @@ namespace tsw
             TSW_UNLOCK;
         }
 
-        virtual void FinishFlush() { }
-
     protected:
+        virtual void FinishFlush() { }        
+
         virtual void Write(const std::tuple<U, Ts...>& item) = 0;
 
         size_t _cacheCapacity = 1000;
@@ -241,7 +250,7 @@ namespace tsw
             WriteItem(item);
         }
 
-        template<std::size_t I = 0, typename... Vs> inline typename std::enable_if<I == sizeof...(Vs), void>::type WriteItem(const std::tuple<Vs...>& t)
+        template<std::size_t I = 0, typename... Vs> inline typename std::enable_if<I == sizeof...(Vs), void>::type WriteItem(const std::tuple<Vs...>&)
         {
             *_stream << "\n";
         }
