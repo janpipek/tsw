@@ -85,9 +85,9 @@ namespace tsw
 
         const static size_t itemDim = sizeof...(Ts) + 1;
 
-        typedef std::array<std::string, itemDim> nameCollectionT;
+        using nameCollectionT = std::array<std::string, itemDim>;
 
-        typedef std::tuple<U, Ts...> itemT;
+        using itemT = std::tuple<U, Ts...> ;
 
         void SetColumnNames(const nameCollectionT& columnNames)
         {
@@ -202,6 +202,12 @@ namespace tsw
         {
         }
 
+        TSVWriter(const TSVWriter& other) = delete;
+
+        TSVWriter& operator=(const TSVWriter& other) = delete;
+
+        // TODO: Add move constructors
+
         virtual ~TSVWriter()
         {
             Flush();
@@ -270,6 +276,10 @@ namespace tsw
 
         virtual void FinishFlush()
         {
+            if (_opened)
+            {
+                Open();    // For empty results
+            }
             _stream->flush();
         }
 
