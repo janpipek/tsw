@@ -152,6 +152,7 @@ namespace tsw
         void Flush() override
         {
             TSW_LOCK;
+            StartFlush();
             for (auto item : _data) {
                 Write(item);
             }
@@ -162,6 +163,8 @@ namespace tsw
         }
 
     protected:
+        virtual void StartFlush() { }
+
         virtual void FinishFlush() { }
 
         virtual void Write(const std::tuple<U, Ts...>& item) = 0;
@@ -257,6 +260,14 @@ namespace tsw
 
         int _precision;
 
+        virtual void StartFlush()
+        {
+            if (!_opened)
+            {
+                Open();
+            }
+        }
+
         virtual void FinishFlush()
         {
             _stream->flush();
@@ -264,10 +275,6 @@ namespace tsw
 
         virtual void Write(const std::tuple<U, Ts...>& item) override
         {
-            if (!_opened)
-            {
-                Open();
-            }
             WriteItem(item);
         }
 
