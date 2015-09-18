@@ -215,6 +215,7 @@ namespace tsw
             {
                 _stream->close();
                 delete _stream;
+                _stream = nullptr;
             }
         }
 
@@ -266,7 +267,7 @@ namespace tsw
 
         int _precision;
 
-        virtual void StartFlush()
+        void StartFlush() override
         {
             if (!_opened)
             {
@@ -274,16 +275,12 @@ namespace tsw
             }
         }
 
-        virtual void FinishFlush()
+        void FinishFlush() override
         {
-            if (_opened)
-            {
-                Open();    // For empty results
-            }
             _stream->flush();
         }
 
-        virtual void Write(const std::tuple<U, Ts...>& item) override
+        void Write(const std::tuple<U, Ts...>& item) override
         {
             WriteItem(item);
         }
