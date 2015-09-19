@@ -83,7 +83,7 @@ namespace tsw
             TSW_MUTEX_INITIALIZATION;
         }
 
-        const static size_t itemDim = sizeof...(Ts) + 1;
+        constexpr static size_t itemDim = sizeof...(Ts) + 1;
 
         using nameCollectionT = std::array<std::string, itemDim>;
 
@@ -91,11 +91,13 @@ namespace tsw
 
         void SetColumnNames(const nameCollectionT& columnNames)
         {
+            // TODO: Prohibit once first data item is stored
             _columnNames = new nameCollectionT(columnNames);
         }
 
         template <class... Vs> void SetColumnNames(const std::string& name1, const Vs&... names)
         {
+            // TODO: Prohibit once first data item is stored
             static_assert(sizeof...(Vs) == (itemDim - 1), "Column names must be of the same dimension as data.");
             if (_columnNames)
             {
@@ -205,8 +207,6 @@ namespace tsw
         TSVWriter(const TSVWriter& other) = delete;
 
         TSVWriter& operator=(const TSVWriter& other) = delete;
-
-        // TODO: Add move constructors
 
         virtual ~TSVWriter()
         {
