@@ -59,10 +59,19 @@ namespace tsw
     class ThreadSafeWriter
     {
     public:
+        /**
+          * @short Set how many rows will be cached at maximum
+          *        before the flushing is forced.
+          */
         virtual void SetCacheCapacity(size_t capacity) = 0;
 
         virtual bool IsFlushRequired() = 0;
 
+        /**
+          * @short This method forces data to be written to the file.
+          *
+          * Automatically triggered when the cache is full and in the destructor.
+          */
         virtual void Flush() = 0;
 
         virtual ~ThreadSafeWriter() = default;     // Enable polymorphism
