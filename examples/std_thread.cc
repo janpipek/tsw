@@ -1,4 +1,4 @@
-// g++ -std=c++11 std_thread.cc -I.. -o -lpthread std_thread ; ./std_thread; cat out.tsv
+// g++ -std=c++11 std_thread.cc -I.. -lpthread -o std_thread ; ./std_thread; cat out.tsv
 
 /**
   * This example starts a lot of threads each of which prints two messages ("hi!" and "bye!")
@@ -8,6 +8,7 @@
 #include <thread>
 #include <random>
 #include <chrono>
+#include <iostream>
 
 #define TSW_USE_CPPT11_THREADS
 #include "tsw.hh"
@@ -18,6 +19,7 @@ using namespace std;
 int main() {
     tsw::TSVWriter<int, std::string> writer("out.tsv");
     writer.SetColumnNames("thread-id", "message");
+    writer.SetCacheCapacity(37);
 
     auto thread_func = [&writer](int i){
         writer.Store(i, "hi!");
@@ -42,4 +44,5 @@ int main() {
     {
         thread->join();
     }
+    cout << writer.GetItemsStored() << " items stored." << endl;
 }

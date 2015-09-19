@@ -14,10 +14,11 @@
 #include <array>
 #include <fstream>
 #include <iomanip>
+#include <memory>
+#include <stdexcept>
 
 #ifdef TSW_USE_POSIX_THREADS
     #include <pthread.h>
-    #include <stdexcept>
     #define TSW_MUTEX_DECLARATION pthread_mutex_t _mutex
     #define TSW_MUTEX_INITIALIZATION pthread_mutexattr_t attr;\
         pthread_mutexattr_init(&attr);\
@@ -65,7 +66,7 @@ namespace tsw
           */
         virtual void SetCacheCapacity(size_t capacity) = 0;
 
-        virtual bool IsFlushRequired() = 0;
+        virtual bool IsFlushRequired() const = 0;
 
         /**
           * @short This method forces data to be written to the file.
@@ -75,6 +76,10 @@ namespace tsw
         virtual void Flush() = 0;
 
         virtual ~ThreadSafeWriter() = default;     // Enable polymorphism
+
+        virtual size_t GetItemsStored() const noexcept = 0;
+
+        virtual size_t GetItemsWritten() const noexcept = 0;
     };
 
     template <class... Ts> class BaseThreadSafeWriter : public ThreadSafeWriter { };
@@ -100,28 +105,27 @@ namespace tsw
 
         void SetColumnNames(const nameCollectionT& columnNames)
         {
-            // TODO: Prohibit once first data item is stored
-            _columnNames = new nameCollectionT(columnNames);
+            TSW_LOCK;
+            if (_itemsStored)
+            {
+                throw std::runtime_error("Cannot change column names after items were already written.");
+            }            
+            _columnNames.reset(new nameCollectionT(columnNames));
+            TSW_UNLOCK;
         }
 
         template <class... Vs> void SetColumnNames(const std::string& name1, const Vs&... names)
         {
-            // TODO: Prohibit once first data item is stored
             static_assert(sizeof...(Vs) == (itemDim - 1), "Column names must be of the same dimension as data.");
-            if (_columnNames)
+            
+            TSW_LOCK;
+            if (_itemsStored)
             {
-                delete _columnNames;
+                throw std::runtime_error("Cannot change column names after items were already written.");
             }
             auto temp = nameCollectionT{name1, names...};
-            _columnNames = new nameCollectionT(temp);
-        }
-
-        virtual ~BaseThreadSafeWriter()
-        {
-            if (_columnNames)
-            {
-                delete _columnNames;
-            }
+            _columnNames.reset(new nameCollectionT(temp));
+            TSW_UNLOCK;
         }
 
         void Store(const itemT& item)
@@ -132,6 +136,7 @@ namespace tsw
             {
                 Flush();
             }
+            _itemsStored++;
             TSW_UNLOCK;
         }
 
@@ -140,7 +145,7 @@ namespace tsw
             Store(std::make_tuple(first, args...));
         }
 
-        bool IsFlushRequired() override
+        bool IsFlushRequired() const override
         {
             return _data.size() == _cacheCapacity;
         }
@@ -164,14 +169,21 @@ namespace tsw
         {
             TSW_LOCK;
             StartFlush();
+            int localWritten = 0;
             for (auto item : _data) {
                 Write(item);
+                localWritten++;
             }
+            _itemsWritten += localWritten;
             FinishFlush();
             _data.clear();
             _data.reserve(_cacheCapacity);
             TSW_UNLOCK;
         }
+
+        virtual size_t GetItemsStored() const noexcept override { return _itemsStored; }
+
+        virtual size_t GetItemsWritten() const noexcept override { return _itemsWritten; }
 
     protected:
         virtual void StartFlush() { }
@@ -182,11 +194,15 @@ namespace tsw
 
         size_t _cacheCapacity = 1000;
 
+        size_t _itemsStored = 0;
+
+        size_t _itemsWritten = 0;
+
         std::vector<itemT> _data;
 
         TSW_MUTEX_DECLARATION;
 
-        nameCollectionT* _columnNames;
+        std::unique_ptr<nameCollectionT> _columnNames;
     };
 
     template <class... Ts> class TSVWriter : public BaseThreadSafeWriter<> { };
@@ -223,8 +239,6 @@ namespace tsw
             if (_opened)
             {
                 _stream->close();
-                delete _stream;
-                _stream = nullptr;
             }
         }
 
@@ -250,7 +264,7 @@ namespace tsw
     protected:
         void Open()
         {
-            _stream = new std::ofstream(_fileName);
+            _stream.reset(new std::ofstream(_fileName));
             (*_stream) << std::setprecision(_precision);
             if (_columnNames)
             {
@@ -268,7 +282,7 @@ namespace tsw
 
         std::string _fileName;
 
-        std::ofstream* _stream;
+        std::unique_ptr<std::ofstream> _stream;
 
         std::string _columnSeparator;
 
