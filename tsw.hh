@@ -1,3 +1,5 @@
+#infdef TSW_HEADER_INCLUDED
+#define TSW_HEADER_INCLUDED
 /**
   * (T)hread-(S)afe cached data (W)riter for C++ 11
   *
@@ -92,7 +94,7 @@ namespace tsw
     template <class U, class... Ts> class BaseThreadSafeWriter<U, Ts...> : public BaseThreadSafeWriter<>
     {
     public:
-        BaseThreadSafeWriter() : _columnNames(nullptr)
+        BaseThreadSafeWriter() : _data(), _columnNames(nullptr)
         {
             TSW_MUTEX_INITIALIZATION;
         }
@@ -320,3 +322,4 @@ namespace tsw
         }
     };
 }
+#endif

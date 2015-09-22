@@ -69,6 +69,6 @@ x       x^2
 10      100  
 ```
 
-## Threading example
+### Threading example
 
 See `examples/std_thread.cc`
