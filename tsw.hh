@@ -17,6 +17,12 @@
 #include <memory>
 #include <stdexcept>
 
+#define TSW_USE_POSIX_THREADS
+#define noexcept
+#define nullptr 0
+#define constexpr const
+#define override
+
 #ifdef TSW_USE_POSIX_THREADS
     #include <pthread.h>
     #define TSW_MUTEX_DECLARATION pthread_mutex_t _mutex
@@ -92,16 +98,16 @@ namespace tsw
     template <class U, class... Ts> class BaseThreadSafeWriter<U, Ts...> : public BaseThreadSafeWriter<>
     {
     public:
-        BaseThreadSafeWriter() : _columnNames(nullptr)
+        BaseThreadSafeWriter() : _columnNames(nullptr), _cacheCapacity(1000), _itemsStored(0), _itemsWritten(0)
         {
             TSW_MUTEX_INITIALIZATION;
         }
 
         constexpr static size_t itemDim = sizeof...(Ts) + 1;
 
-        using nameCollectionT = std::array<std::string, itemDim>;
+        typedef std::array<std::string, itemDim> nameCollectionT;
 
-        using itemT = std::tuple<U, Ts...> ;
+        typedef std::tuple<U, Ts...> itemT;
 
         void SetColumnNames(const nameCollectionT& columnNames)
         {
@@ -170,8 +176,10 @@ namespace tsw
             TSW_LOCK;
             StartFlush();
             int localWritten = 0;
-            for (auto item : _data) {
-                Write(item);
+            for (auto item = _data.begin(); item != _data.end(); item++)
+            {
+            // for (auto item : _data) {
+                Write(*item);
                 localWritten++;
             }
             _itemsWritten += localWritten;
@@ -192,11 +200,11 @@ namespace tsw
 
         virtual void Write(const std::tuple<U, Ts...>& item) = 0;
 
-        size_t _cacheCapacity = 1000;
+        size_t _cacheCapacity;
 
-        size_t _itemsStored = 0;
+        size_t _itemsStored;
 
-        size_t _itemsWritten = 0;
+        size_t _itemsWritten;
 
         std::vector<itemT> _data;
 
@@ -224,7 +232,7 @@ namespace tsw
     public:
         using BaseThreadSafeWriter<U, Ts...>::itemDim;
 
-        TSVWriter(const std::string& fileName) : _fileName(fileName), _stream(nullptr),
+        TSVWriter(const std::string& fileName) : _opened(false), _fileName(fileName), _stream(nullptr),
             _columnSeparator("\t"), _lineSeparator("\n"), _precision(6)
         {
         }
@@ -278,7 +286,7 @@ namespace tsw
             _opened = true;
         }
 
-        bool _opened = false;
+        bool _opened;
 
         std::string _fileName;
 
