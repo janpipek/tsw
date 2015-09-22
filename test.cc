@@ -12,7 +12,7 @@ int main()
     std::tuple<int, int, std::string> x{1, 2, f};
     writer.SetCacheCapacity(5);
     writer.SetPrecision(3);
-    for (int i = 1; i < 11; i++)
+    for (int i = 1; i < 21; i++)
     {
         writer.Store(i, i * i, sqrt(i));
     }

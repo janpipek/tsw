@@ -25,7 +25,9 @@ In any case, the order of stored rows is preserved.
 This small library is header-only. Just copy `tsw.hh` to your project and start
 using it. You need:
 
-* a C++11-supporting compiler.
+* a C++11-supporting compiler, tested ones include:
+	* gcc 4.4.7, 5.1.1 (should work for all 4.4+)
+	* clang 3.5
 * pthread (needed if used directly, needed in GCC on Linux)
 
 ## Limitations

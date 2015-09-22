@@ -1,4 +1,4 @@
-#infdef TSW_HEADER_INCLUDED
+#ifndef TSW_HEADER_INCLUDED
 #define TSW_HEADER_INCLUDED
 /**
   * (T)hread-(S)afe cached data (W)riter for C++ 11
@@ -8,6 +8,23 @@
   * This file can be used as is without external dependencies,
   * see https://github.com/janpipek/tsw .
   */
+
+// Some hacking to make this work in various gcc older versions
+#if __GNUG__ && !defined(__clang_major__)
+    #if __GNUG__ < 4 || (__GNUG__ == 4 && __GNUC_MINOR < 4)
+        #error Only supported in gcc >= 4.4
+    #endif
+    #if (__GNUG__ == 4 && __GNUC_MINOR < 5)
+        #define noexcept
+    #endif
+    #if (__GNUG__ == 4 && __GNUC_MINOR < 6)
+        #define constexpr const
+        #define nullptr 0   // Good style but necessary
+    #endif
+    #if (__GNUG__ == 4 && __GNUC_MINOR < 7)
+        #define override    // Good style but necessary
+    #endif
+#endif
 
 #include <tuple>
 #include <vector>
@@ -19,6 +36,7 @@
 #include <memory>
 #include <stdexcept>
 
+// Enable explicitely not to use standard thread API (question is if it has any sense...)
 #ifdef TSW_USE_POSIX_THREADS
     #include <pthread.h>
     #define TSW_MUTEX_DECLARATION pthread_mutex_t _mutex
@@ -94,16 +112,16 @@ namespace tsw
     template <class U, class... Ts> class BaseThreadSafeWriter<U, Ts...> : public BaseThreadSafeWriter<>
     {
     public:
-        BaseThreadSafeWriter() : _data(), _columnNames(nullptr)
+        BaseThreadSafeWriter() : _columnNames(), _cacheCapacity(1000), _itemsStored(0), _itemsWritten(0)
         {
             TSW_MUTEX_INITIALIZATION;
         }
 
         constexpr static size_t itemDim = sizeof...(Ts) + 1;
 
-        using nameCollectionT = std::array<std::string, itemDim>;
+        typedef std::array<std::string, itemDim> nameCollectionT;
 
-        using itemT = std::tuple<U, Ts...> ;
+        typedef std::tuple<U, Ts...> itemT;
 
         void SetColumnNames(const nameCollectionT& columnNames)
         {
@@ -172,8 +190,10 @@ namespace tsw
             TSW_LOCK;
             StartFlush();
             int localWritten = 0;
-            for (auto item : _data) {
-                Write(item);
+            for (auto item = _data.begin(); item != _data.end(); item++)
+            {
+            // for (auto item : _data) {
+                Write(*item);
                 localWritten++;
             }
             _itemsWritten += localWritten;
@@ -194,11 +214,11 @@ namespace tsw
 
         virtual void Write(const std::tuple<U, Ts...>& item) = 0;
 
-        size_t _cacheCapacity = 1000;
+        size_t _cacheCapacity;
 
-        size_t _itemsStored = 0;
+        size_t _itemsStored;
 
-        size_t _itemsWritten = 0;
+        size_t _itemsWritten;
 
         std::vector<itemT> _data;
 
@@ -226,7 +246,7 @@ namespace tsw
     public:
         using BaseThreadSafeWriter<U, Ts...>::itemDim;
 
-        TSVWriter(const std::string& fileName) : _fileName(fileName), _stream(nullptr),
+        TSVWriter(const std::string& fileName) : _opened(false), _fileName(fileName), _stream(),
             _columnSeparator("\t"), _lineSeparator("\n"), _precision(6)
         {
         }
@@ -280,7 +300,7 @@ namespace tsw
             _opened = true;
         }
 
-        bool _opened = false;
+        bool _opened;
 
         std::string _fileName;
 
