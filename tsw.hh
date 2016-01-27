@@ -11,17 +11,17 @@
 
 // Some hacking to make this work in various gcc older versions
 #if __GNUG__ && !defined(__clang_major__)
-    #if __GNUG__ < 4 || (__GNUG__ == 4 && __GNUC_MINOR < 4)
+    #if __GNUG__ < 4 || (__GNUG__ == 4 && __GNUC_MINOR__ < 4)
         #error Only supported in gcc >= 4.4
     #endif
-    #if (__GNUG__ == 4 && __GNUC_MINOR < 5)
+    #if (__GNUG__ == 4 && __GNUC_MINOR__ < 5)
         #define noexcept
     #endif
-    #if (__GNUG__ == 4 && __GNUC_MINOR < 6)
+    #if (__GNUG__ == 4 && __GNUC_MINOR__ < 6)
         #define constexpr const
         #define nullptr 0   // Good style but necessary
     #endif
-    #if (__GNUG__ == 4 && __GNUC_MINOR < 7)
+    #if (__GNUG__ == 4 && __GNUC_MINOR__ < 7)
         #define override    // Good style but necessary
     #endif
 #endif
